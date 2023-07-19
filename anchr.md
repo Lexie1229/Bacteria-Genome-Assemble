@@ -50,12 +50,18 @@ anchr --help
         * -p/--parallel parallel：Number of threads[default:8].
     * merge：Merge Illumina PE reads with bbtools.
         * anchr merge [OPTIONS] infiles
-        * --ecphase ecphase：Error-correct phases. Phase 2 can be skipped [default:1 2 3].
+        * --ecphase ecphase：Error-correct phases. Phase 2 can be skipped [default:1 2 3] (指定合并的阶段).
         * -o/--outfile outfile：Output filename [stdout] for screen[default:merge.sh].
         * -p/--parallel parallel：Number of threads[default:8].
     * quorum：Run quorum to discard bad reads.
         * anchr quorum [OPTIONS] infiles
         * -o/--outfile outfile：Output filename [stdout] for screen[default:quorum.sh].
+    * unitigs：Create unitigs from trimmed/merged reads.
+        * anchr unitigs [OPTIONS] infiles
+        * --kmer kmer：K-mer size to be used [default: 31].
+        * -p/--parallel parallel：Number of threads [default: 8].
+        * -u/--unitigger unitigger：Which unitig constructor to use: bcalm, bifrost, superreads, or tadpole [default:superreads] (指定unitig算法).
+        * -o/--outfile outfile：Output filename. [stdout] for screen [default: unitigs.sh].
     * template：Creates Bash scripts.
         * anchr template [FLAGS] [OPTIONS]
         * --genome genome：Your best guess of the haploid genome size [default:1000000] (预测的基因组大小).
@@ -85,12 +91,19 @@ anchr --help
         * --extend：Extend anchors with other contigs.
         * --busco：Run busco.
     * anchors：Select anchors (proper covered regions) from contigs.
-    * unitigs：Create unitigs from trimmed/merged reads.
-        * anchr unitigs [OPTIONS] infiles
-        * --kmer kmer：K-mer size to be used [default: 31].
+        * anchr anchors [FLAGS] [OPTIONS] infiles
+        * --keepedge：Keep edges of anchors.
+        * --longest：Only keep the longest proper region.
+        * --fill fill：Fill holes short than or equal to this [default:1].
+        * --lscale lscale：The scale factor for lower, (median - k*MAD) / l [default:3].
+        * --min min：Minimal length of anchors [default:1000].
+        * --mincov mincov>：Minimal coverage of reads [default:5].
+        * --mscale mscale：The scale factor for MAD, median +/-k * MAD [default:3].
+        * --ratio ratio：Fill large holes (opt.fill * 10) when covered ratio larger than this [default:0.98].
+        * --readl readl：Length of reads [default:100] (指定reads长度).
+        * --uscale uscale：The scale factor for upper, (median + k * MAD) * u [default:2].
+        * -o/--outfile outfile：Output filename. [stdout] for screen [default:anchors.sh].
         * -p/--parallel parallel：Number of threads [default: 8].
-        * -u/--unitigger unitigger：Which unitig constructor to use: bcalm, bifrost, superreads, or tadpole [default:superreads].
-        * -o/--outfile outfile：Output filename. [stdout] for screen [default: unitigs.sh].
     * help：Prints this message or the help of the given subcommand(s).
 
 * 补充：
@@ -99,7 +112,7 @@ anchr --help
     * SE(Single-End)：单端测序
     * ENA(European Nucleotide Archive)：provide a comprehensive record of the world’s nucleotide sequencing information, covering raw sequencing data, sequence assembly information and functional annotation
 
-### Dependences
+### Runtime Dependences
 
 ```bash
 brew install perl cpanminus
@@ -193,7 +206,7 @@ highly heterozygous diploids from massively parallel shotgun sequencing data(基
     * `scales`：Scale Functions for Visualization，Graphical scales map data to aesthetics, and provide methods for automatically determining breaks and labels for axes and legends(轴和图例).
     * `viridis`：Data frame of the viridis palette(调色板).
 
-### Subcommands
+### Individual Subcommands
 
 * `Lambda`：数据
 
@@ -239,7 +252,10 @@ R1.fq.gz  R2.fq.gz  Rs.fq.gz
 mkdir -p merge
 pushd merge
 
-# 合并：
+# 合并：三个步骤，使用BBTools
+# 1 Basic merging：根据overlap合并reads
+# 2 Overlap-based error-correction：纠正overlap的reads
+# 3 Merging of nonoverlapping reads using kmers：使用kmers合并非重叠的reads
 anchr merge \
     ../trim/R1.fq.gz ../trim/R2.fq.gz ../trim/Rs.fq.gz \
     --ecphase "1 2 3" \
@@ -260,6 +276,7 @@ ecco.fq.gz     M1.fq.gz        M.ihist.merge.txt   U2.fq.gz    Us.fq.gz
 * `quorum`：纠错
 
 ```bash
+# 纠错
 pushd trim
 anchr quorum \
     R1.fq.gz R2.fq.gz \
@@ -267,6 +284,7 @@ anchr quorum \
     bash
 popd
 
+# 纠错：Q25L60
 pushd trim/Q25L60
 anchr quorum \
     R1.fq.gz R2.fq.gz Rs.fq.gz \
@@ -277,10 +295,7 @@ popd
 
 ```txt
 # 结果
-env.json  
-pe.cor.fa.gz
-pe.discard.lst
-quorum.err   
+env.json  pe.cor.fa.gz  pe.discard.lst  quorum.err   
 ```
 
 * `unitigs` - superreads
@@ -301,7 +316,12 @@ bash unitigs.sh
 popd
 ```
 
-* `unitigs` - tadpole
+```txt
+# 结果
+env.json  pe.cor.fa  unitigs.fasta  unitigs.sh
+```
+
+* `unitigs` - TADpole
 
 ```bash
 mkdir -p tadpole
@@ -317,7 +337,7 @@ bash unitigs.sh
 popd
 ```
 
-* `unitigs` - bcalm：De Bruijn graph(DBG)组装算法
+* `unitigs` - BCALM：使用De Bruijn graph(DBG)组装算法
 
 ```bash
 mkdir -p bcalm
