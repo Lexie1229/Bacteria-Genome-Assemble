@@ -2,7 +2,18 @@
 
 * Anchr：the Assembler of N-free CHRomosomes.
 
-### Install
+## 目录
+
+* [Install](#Install)
+* [Synopsis](#Synopsis)
+* [Runtime Dependences](#RuntimeDependences)
+* [Individual Subcommands](#IndividualSubcommands)
+* [Example](#Example)
+    * [E. coli str. K-12 substr. DH5alpha](#dh5alpha)
+    * [E. coli str. K-12 substr. MG1655](#mg1655)
+
+
+* Anchr：the Assembler of N-free CHRomosomes.
 
 ```bash
 mkdir -p ${HOME}/bin
@@ -22,7 +33,7 @@ anchr --help
 ```
 
 * jq：a lightweight and flexible command-line JSON processor.
-    * jq [options] jq filter [file]
+    * jq [options] [jq filter] [file]
     * -r/--raw-output：if the filter's result is a string then it will be written directly to standard output rather than being formatted as a JSON string with quotes.
     * .items[].name：array construction to collect all the results of a filter into an array(创建数组去收集所有符合过滤条件的结果).
     * select(boolean_expression)：produce its input unchanged if returns true for the input, and produces no output otherwise(判断布尔值，如果为真则输出结果).
@@ -31,7 +42,7 @@ anchr --help
     * API：application programming interface，应用程序编程接口
     * JSON格式
 
-### Synopsis
+### [Synopsis](#Synopsis)
 
 * anchr [SUBCOMMAND]
     * dep：Dependencies.
@@ -112,7 +123,7 @@ anchr --help
     * SE(Single-End)：单端测序
     * ENA(European Nucleotide Archive)：provide a comprehensive record of the world’s nucleotide sequencing information, covering raw sequencing data, sequence assembly information and functional annotation
 
-### Runtime Dependences
+### [Runtime Dependences](#RuntimeDependences)
 
 ```bash
 brew install perl cpanminus
@@ -180,7 +191,7 @@ source ~/.bashrc
 # 安装quorum，Quality Optimized Reads from the University of Maryland，is an error corrector for Illumina reads
 sudo apt install quorum
 
-## 安装App::Fasops和App::Dazz
+# 安装App::Fasops和App::Dazz
 sudo cpan install App::Fasops
 sudo cpan install App::Daz
 ```
@@ -206,7 +217,7 @@ highly heterozygous diploids from massively parallel shotgun sequencing data(基
     * `scales`：Scale Functions for Visualization，Graphical scales map data to aesthetics, and provide methods for automatically determining breaks and labels for axes and legends(轴和图例).
     * `viridis`：Data frame of the viridis palette(调色板).
 
-### Individual Subcommands
+### [Individual Subcommands](#IndividualSubcommands)
 
 * `Lambda`：数据
 
@@ -370,32 +381,48 @@ bash anchors.sh
 popd
 ```
 
-### Example
+### [Example](#Example)
 
 * Assemble Genomes：[model organisms(E. coli)](https://github.com/wang-q/anchr/blob/main/results/model.md)、[FDA-ARGOS bacteria](https://github.com/wang-q/anchr/blob/main/results/fda_argos.md)、[Yeast](https://github.com/wang-q/anchr/blob/main/results/yeast.md)
 
-#### E. coli str. K-12 substr. DH5alpha
+#### [E. coli str. K-12 substr. DH5alpha](#dh5alpha)
 
 * Reference Genome
 
 ```bash
-# 下载参考数据
+# 下载参考数据：dh5alpha
 mkdir -p ~/biodata/bga/anchr/ref
 cd ~/biodata/bga/anchr/ref
-rsync -avP ftp.ncbi.nlm.nih.gov::genomes/all/GCF/001/723/505/GCF_001723505.1_ASM172350v1 dh5alpha
+rsync -avP ftp.ncbi.nlm.nih.gov::genomes/all/GCF/001/723/505/GCF_001723505.1_ASM172350v1 dh5alpha/
 
 # 参考基因组
 mkdir -p ~/biodata/bga/anchr/dh5alpha/1_genome
 cd ~/biodata/bga/anchr/dh5alpha/1_genome
+## genome
 find ~/biodata/bga/anchr/ref/dh5alpha/ -name "*_genomic.fna.gz" |
     grep -v "_from_" |
     xargs gzip -dcf |
     faops filter -N -s stdin genome.fa
+## -N：convert IUPAC ambiguous codes to 'N'
+## -s：simplify sequence names
 ```
 
 * Sequencing Data Download
 
 ```bash
+mkdir -p ~/biodata/bga/anchr/dh5alpha/2_illumina
+cd ~/biodata/bga/anchr/dh5alpha/2_illumina
+
+# 下载测序数据：ena
+aria2c -x 9 -s 3 -c ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR112/039/SRR11245239/SRR11245239_1.fastq.gz
+aria2c -x 9 -s 3 -c ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR112/039/SRR11245239/SRR11245239_2.fastq.gz
+
+# 建立软链接，以确保测序数据文件名的格式
+ln -s SRR11245239_1.fastq.gz R1.fq.gz
+ln -s SRR11245239_2.fastq.gz R2.fq.gz
+
+# 存在问题
+----------------------------------------------------------------------------------------------------
 mkdir -p ~/biodata/bga/anchr/dh5alpha/ena
 cd ~/biodata/bga/anchr/dh5alpha/ena
 
@@ -431,9 +458,7 @@ md5sum --check ena_info.md5.txt
 ## -c/--check：read checksums from the FILEs and check them
 ## md5sum：compute and check MD5 message digest
 ## MD5 checksum：a 32-character hexadecimal number that is computed on a file
-```
 
-```bash
 # Illumina
 mkdir -p ~/biodata/bga/anchr/dh5alpha/2_illumina
 cd ~/biodata/bga/anchr/dh5alpha/2_illumina
@@ -441,7 +466,10 @@ cd ~/biodata/bga/anchr/dh5alpha/2_illumina
 # 建立软链接，以确保测序数据文件名的格式
 ln -s ../ena/SRR11245239_1.fastq.gz R1.fq.gz
 ln -s ../ena/SRR11245239_2.fastq.gz R2.fq.gz
+----------------------------------------------------------------------------------------------------
 ```
+
+* 补充
 
 ```bash
 # sampling reads as test materials
@@ -467,22 +495,26 @@ cd ${WORKING_DIR}/${BASE_NAME}
 rm *.sh
 anchr template \
     --genome 4583637 \
-    --parallel 10 \
-    --xmx 80g \
+    --parallel 12 \
+    --xmx 10g \
     --queue mpi \
-    \
+    # Info
+    \ 
     --fastqc \
     --insertsize \
     --kat \
+    # Quality check：2_fastqc.sh、2_insert_size.sh、2_kat.sh
     \
     --trim "--dedupe --cutoff 30 --cutk 31" \
     --qual "25 30" \
     --len "60" \
     --filter "adapter artifact" \
+    # trimming：2_trim.sh--9_stat_reads.sh
     \
     --quorum \
     --merge \
     --ecphase "1 2 3" \
+    # Post-trimming：2_merge.sh、2_quorum.sh
     \
     --cov "40 80" \
     --unitigger "superreads bcalm tadpole" \
@@ -491,10 +523,52 @@ anchr template \
     --uscale 2 \
     --lscale 3 \
     --redo \
+    # Down sampling, unitigs, and anchors
     \
     --extend \
     \
     --busco
+## 调整并行个数parallel和内存大小xmx
+```
+
+```text
+# 生成的脚本文件
+Create 2_fastqc.sh
+Create 2_insert_size.sh
+Create 2_kat.sh
+Create 2_trim.sh
+Create 9_stat_reads.sh
+Create 2_quorum.sh
+Create 4_down_sampling.sh
+Create 4_unitigs_superreads.sh
+Create 4_unitigs_bcalm.sh
+Create 4_unitigs_tadpole.sh
+Create 4_anchors.sh
+Create 9_stat_anchors.sh
+Create 2_merge.sh
+Create 6_down_sampling.sh
+Create 6_unitigs_superreads.sh
+Create 6_unitigs_bcalm.sh
+Create 6_unitigs_tadpole.sh
+Create 6_anchors.sh
+Create 9_stat_mr_anchors.sh
+Create 7_merge_anchors.sh
+Create 9_stat_merge_anchors.sh
+Create 8_spades.sh
+Create 8_megahit.sh
+Create 8_platanus.sh
+Create 8_mr_spades.sh
+Create 8_mr_megahit.sh
+Create 9_stat_other_anchors.sh
+Create 7_glue_anchors.sh
+Create 7_fill_anchors.sh
+Create 9_quast.sh
+Create 9_stat_final.sh
+Create 9_busco.sh
+Create 0_cleanup.sh
+Create 0_real_clean.sh
+Create 0_master.sh
+Create 0_bsub.sh
 ```
 
 * Genome Assemble
@@ -539,4 +613,85 @@ bash 0_master.sh
 prettier -w 9_markdown/*.md
 
 # bash 0_cleanup.sh
+```
+
+#### [E. coli str. K-12 substr. MG1655](#mg1655)
+
+* Reference Genome
+
+```bash
+# 下载参考数据：mg1655
+mkdir -p ~/biodata/bga/anchr/ref
+cd ~/biodata/bga/anchr/ref
+rsync -avP ftp.ncbi.nlm.nih.gov::genomes/all/GCF/000/005/845/GCF_000005845.2_ASM584v2/ mg1655/
+
+# 参考基因组
+mkdir -p ~/biodata/bga/anchr/mg1655/1_genome
+cd ~/biodata/bga/anchr/mg1655/1_genome
+## genome
+find ~/biodata/bga/anchr/ref/mg1655/ -name "*_genomic.fna.gz" |
+    grep -v "_from_" |
+    xargs gzip -dcf |
+    faops filter -N -s stdin genome.fa
+## -N：convert IUPAC ambiguous codes to 'N'
+## -s：simplify sequence names
+```
+
+* Sequencing Data Download
+
+```bash
+mkdir -p ~/biodata/bga/anchr/mg1655/2_illumina
+cd ~/biodata/bga/anchr/mg1655/2_illumina
+
+# 下载测序数据：illumina
+aria2c -x 9 -s 3 -c ftp://webdata:webdata@ussd-ftp.illumina.com/Data/SequencingRuns/MG1655/MiSeq_Ecoli_MG1655_110721_PF_R1.fastq.gz
+aria2c -x 9 -s 3 -c ftp://webdata:webdata@ussd-ftp.illumina.com/Data/SequencingRuns/MG1655/MiSeq_Ecoli_MG1655_110721_PF_R2.fastq.gz
+
+# 建立软链接，以确保测序数据文件名的格式
+ln -s MiSeq_Ecoli_MG1655_110721_PF_R1.fastq.gz R1.fq.gz
+ln -s MiSeq_Ecoli_MG1655_110721_PF_R2.fastq.gz R2.fq.gz
+```
+
+* Generate Template
+
+```bash
+WORKING_DIR=${HOME}/biodata/bga/anchr
+BASE_NAME=mg1655
+
+cd ${WORKING_DIR}/${BASE_NAME}
+
+rm *.sh
+anchr template \
+    --genome 4641652 \
+    --parallel 24 \
+    --xmx 80g \
+    --queue mpi \
+    \
+    --fastqc \
+    --insertsize \
+    --kat \
+    \
+    --trim "--dedupe --tile --cutoff 30 --cutk 31" \
+    --qual "25 30" \
+    --len "60" \
+    --filter "adapter artifact" \
+    \
+    --quorum \
+    --merge \
+    --ecphase "1 2 3" \
+    \
+    --bwa "Q25L60" \
+    --gatk \
+    \
+    --cov "40 80" \
+    --unitigger "superreads bcalm tadpole" \
+    --statp 2 \
+    --readl 151 \
+    --uscale 2 \
+    --lscale 3 \
+    --redo \
+    \
+    --extend \
+    \
+    --busco
 ```
