@@ -13,7 +13,7 @@
     * [E. coli str. K-12 substr. MG1655](#mg1655)
 
 
-* Anchr：the Assembler of N-free CHRomosomes.
+### [Install](#Install)
 
 ```bash
 mkdir -p ${HOME}/bin
