@@ -2,16 +2,13 @@
 
 * Anchr：the Assembler of N-free CHRomosomes.
 
-## 目录
+### 目录
 
 * [Install](#Install)
 * [Synopsis](#Synopsis)
-* [Runtime Dependences](#RuntimeDependences)
-* [Individual Subcommands](#IndividualSubcommands)
+* [Runtime_Dependences](#Runtime_Dependences)
+* [Individual_Subcommands](#Individual_Subcommands)
 * [Example](#Example)
-    * [E. coli str. K-12 substr. DH5alpha](#dh5alpha)
-    * [E. coli str. K-12 substr. MG1655](#mg1655)
-
 
 ### [Install](#Install)
 
@@ -123,7 +120,7 @@ anchr --help
     * SE(Single-End)：单端测序
     * ENA(European Nucleotide Archive)：provide a comprehensive record of the world’s nucleotide sequencing information, covering raw sequencing data, sequence assembly information and functional annotation
 
-### [Runtime Dependences](#RuntimeDependences)
+### [Runtime_Dependences](#Runtime_Dependences)
 
 ```bash
 brew install perl cpanminus
@@ -217,7 +214,7 @@ highly heterozygous diploids from massively parallel shotgun sequencing data(基
     * `scales`：Scale Functions for Visualization，Graphical scales map data to aesthetics, and provide methods for automatically determining breaks and labels for axes and legends(轴和图例).
     * `viridis`：Data frame of the viridis palette(调色板).
 
-### [Individual Subcommands](#IndividualSubcommands)
+### [Individual_Subcommands](#Individual_Subcommands)
 
 * `Lambda`：数据
 
@@ -263,10 +260,7 @@ R1.fq.gz  R2.fq.gz  Rs.fq.gz
 mkdir -p merge
 pushd merge
 
-# 合并：三个步骤，使用BBTools
-# 1 Basic merging：根据overlap合并reads
-# 2 Overlap-based error-correction：纠正overlap的reads
-# 3 Merging of nonoverlapping reads using kmers：使用kmers合并非重叠的reads
+# 合并：纠错包含三个步骤，使用BBTools
 anchr merge \
     ../trim/R1.fq.gz ../trim/R2.fq.gz ../trim/Rs.fq.gz \
     --ecphase "1 2 3" \
@@ -385,7 +379,7 @@ popd
 
 * Assemble Genomes：[model organisms(E. coli)](https://github.com/wang-q/anchr/blob/main/results/model.md)、[FDA-ARGOS bacteria](https://github.com/wang-q/anchr/blob/main/results/fda_argos.md)、[Yeast](https://github.com/wang-q/anchr/blob/main/results/yeast.md)
 
-#### [E. coli str. K-12 substr. DH5alpha](#dh5alpha)
+#### E. coli str. K-12 substr. DH5alpha
 
 * Reference Genome
 
@@ -615,7 +609,7 @@ prettier -w 9_markdown/*.md
 # bash 0_cleanup.sh
 ```
 
-#### [E. coli str. K-12 substr. MG1655](#mg1655)
+#### E. coli str. K-12 substr. MG1655
 
 * Reference Genome
 
