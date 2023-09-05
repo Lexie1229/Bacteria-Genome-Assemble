@@ -91,19 +91,25 @@ readlinkf () {
 START_TIME=$(date +%s)
 
 # Add masurca to $PATH
+## 将masurca可执行文件的路径添加到环境变量中
 export PATH="$(readlinkf "$(which masurca)" | xargs dirname):$PATH"
+## 自定义函数readlinkf，用于获取指定路径的绝对路径
 
 #----------------------------#
 # Renaming reads
 #----------------------------#
 log_info 'Processing pe and/or se library reads'
 
+## 修改序列前缀：pe（R1.fq.gz+R2.fq.gz=pe.renamed.fastq）
 faops interleave \
     -q -p pe \
     'R1.fq.gz' \
     'R2.fq.gz' \
     > 'pe.renamed.fastq'
+## -q，write FQ. The inputs must be FQs
+## -p STR，prefix of names [read]
 
+## 修改序列前缀：se（Rs.fq.gz=se.renamed.fastq）
 faops interleave \
     -q -p se \
     'Rs.fq.gz' \
@@ -112,31 +118,39 @@ faops interleave \
 #----------------------------#
 # Stats of reads
 #----------------------------#
-head -n 80000 pe.renamed.fastq > pe_data.tmp
 
+head -n 80000 pe.renamed.fastq > pe_data.tmp
+## FASTQ格式：label/sequence/+/Q scores(ASCⅡ)
+
+## 确定kmer的大小
+## kmer由GC含量和最小序列长度决定，且不为偶数，且31≤kmer≤127
+## GC<0.5，$min_len*0.7
+## 0.5≤GC<0.6，$min_len*0.5
+## GC≥0.6，$min_len*0.33
 KMER=$(
     tail -n 40000 pe_data.tmp |
         perl -e '
-            my @lines;
-            while ( my $line = <> ) {
-                $line = <>;
+            my @lines;  ## 数组@lines, 储存序列本身
+            while ( my $line = <> ) {  ## 读取第一行, label
+                $line = <>;  ## 读取第二行, sequence
                 chomp($line);
                 push( @lines, $line );
-                $line = <>;
-                $line = <>;
+                $line = <>;  ## 读取第三行, +
+                $line = <>;  ## 读取第四行, Q scores
             }
-            my @legnths;
-            my $min_len    = 100000;
-            my $base_count = 0;
+            my @legnths;  ## 数组@legnths, 储存序列长度
+            my $min_len    = 100000;  ## 初始化变量，最小序列长度
+            my $base_count = 0;  ## 初始化变量，碱基总数
             for my $l (@lines) {
                 $base_count += length($l);
                 push( @lengths, length($l) );
                 for $base ( split( "", $l ) ) {
-                    if ( uc($base) eq "G" or uc($base) eq "C" ) { $gc_count++; }
+                    if ( uc($base) eq "G" or uc($base) eq "C" ) { $gc_count++; }   ## 统计GC含量
+                    ## Perl内置uc函数，转换为大写字母
                 }
             }
-            @lengths  = sort { $b <=> $a } @lengths;
-            $min_len  = $lengths[ int( $#lengths * .75 ) ];
+            @lengths  = sort { $b <=> $a } @lengths; ## 降序排列
+            $min_len  = $lengths[ int( $#lengths * .75 ) ]; ## $#lengths，数组最后一个元素的索引 ## $min_len取75%分位的值
             $gc_ratio = $gc_count / $base_count;
             $kmer     = 0;
             if ( $gc_ratio < 0.5 ) {
@@ -154,33 +168,42 @@ KMER=$(
             print $kmer;
     ' )
 save KMER
+
 log_debug "Choosing kmer size of $KMER"
 
+## 确定最低质量值，33或64
 MIN_Q_CHAR=$(
     head -n 40000 pe_data.tmp |
         awk 'BEGIN{flag=0}{if($0 ~ /^\+/){flag=1}else if(flag==1){print $0;flag=0}}' |
+        ## 提取FASTQ格式的质量分数行
         perl -ne '
-            BEGIN { $q0_char = "@"; }
+            BEGIN { $q0_char = "@"; }  ## 初始化变量
 
             chomp;
             for $v ( split "" ) {
                 if ( ord($v) < ord($q0_char) ) { $q0_char = $v; }
+                ## Perl内置函数ord，用于获取字符的ASCⅡ码
+                ## @对应64
             }
 
             END {
                 $ans = ord($q0_char);
-                if   ( $ans < 64 ) { print "33\n" }
-                else               { print "64\n" }
+                if   ( $ans < 64 ) { print "33\n" }  ## Phred+33 编码方式，33-126，Q=ASCII码值-33
+                else               { print "64\n" }  ## Phred+64 编码方式，64-126，Q=ASCII码值-64
             }
     ')
 save MIN_Q_CHAR
+
 log_debug "MIN_Q_CHAR: $MIN_Q_CHAR"
 
 #----------------------------#
 # Error correct reads
 #----------------------------#
+
+## 调用Quorum
+## 确定Jellyfish hash的大小，500MB
 JF_SIZE=$(
-    ls -l *.fastq |
+    ls -l *.fastq | ## pe.renamed.fastq和se.renamed.fastq
         awk '{n+=$5} END{s=int(n / 50 * 1.1); if(s>500000000)print s;else print "500000000";}'
 )
 perl -e '
@@ -190,12 +213,22 @@ perl -e '
     '
 
 log_info Creating mer database for Quorum.
+
+## 创建数据库
 quorum_create_database \
     -t 12 \
     -s $JF_SIZE -b 7 -m 24 -q $((MIN_Q_CHAR + 5)) \
     -o quorum_mer_db.jf.tmp \
     pe.renamed.fastq se.renamed.fastq \
     && mv quorum_mer_db.jf.tmp quorum_mer_db.jf
+## Create database of k-mers for quorum error corrector
+## -t, --threads=uint32，Number of threads (1)
+## -s, --size=uint64，*Initial hash size
+## -b, --bits=uint32，*Bits for value field
+## -m, --mer=uint32，*Mer length
+## -q, --min-qual-value=uint32，Min quality as an int
+## -o, --output=path，Output file (combined_database)
+## 检查退出状态码
 if [ $? -ne 0 ]; then
     log_warn Increase JF_SIZE by --jf, the recommendation value is genome_size*coverage/2
     exit 1
@@ -222,11 +255,24 @@ quorum_error_correct_reads \
     log_warn Error correction of reads failed.;
     exit 1;
 }
+## Error correct reads from a fastq file based on the k-mer frequencies
+## -q, --qual-cutoff-value=uint32，Any base above with quality equal or greater is untouched when there are multiple choices 不受影响的碱基的最低质量Q
+## -m, --min-count=uint32，Minimum count for a k-mer to be considered "good" (1) 被认为是good的kmer的最低计数
+## -s, --skip=uint32，Number of bases to skip for start k-mer (1) 起始kmer跳过的碱基数
+## -g, --good=uint32，Number of good k-mer in a row for anchor (2)  "anchr kmer"
+## -a, --anchor-count=uint32，Minimum count for an anchor k-mer (3) "anchr kmer"的最低计数
+## -t, --thread=uint32，Number of threads (1) 线程数
+## -w, --window=uint32，Size of window (10) 窗口大小
+## -e, --error=uint32，Maximum number of error in a window (3) 一个窗口内允许出现错误的最多数量
+## -o, --output=prefix，Output file prefix (error_corrected)
+## -v, --verbose，Be verbose (false) 详细输出
+## -d, --no-discard，Do not discard reads, output a single N (false)
 
 log_debug "Discard any reads with subs"
 mv R.cor.fa R.cor.sub.fa
 
 # The quorum appended string styled is 42:sub:C-T or 43:3_trunc
+## 丢弃
 cat R.cor.sub.fa |
     grep ':sub:' |
     perl -nl -e '/^>([\w\/]+)/ and print $1' \
@@ -238,6 +284,8 @@ cat R.cor.sub.fa |
 
 faops some -i -l 0 R.cor.sub.fa R.discard.lst stdout \
     > R.cor.fa
+## -i，Invert, output sequences not in the list
+## -l INT，sequence line length [80]
 
 rm R.cor.sub.fa
 
@@ -247,11 +295,20 @@ rm R.cor.sub.fa
 log_info Estimating genome size.
 
 jellyfish count -m 31 -t 12 -C -s $JF_SIZE -o k_u_hash_0 R.cor.fa
+## jellyfish count，Count k-mers in fasta or fastq files
+## -m, --mer-len=uint32，*Length of mer
+## -t, --threads=uint32，Number of threads (1)
+## -C, --canonical，Count both strand, canonical representation (false)
+## -s, --size=uint64，*Initial hash size
+## -o, --output=string，Output file (mer_counts.jf)
 ESTIMATED_GENOME_SIZE=$(
     jellyfish histo -t 12 -h 1 k_u_hash_0 |
         tail -n 1 |
         awk '{print $2}'
 )
+## jellyfish histo，Create an histogram of k-mer occurrences
+## -h, --high=uint64，High count value of histogram (10000)
+
 save ESTIMATED_GENOME_SIZE
 log_debug "Estimated genome size: $ESTIMATED_GENOME_SIZE"
 

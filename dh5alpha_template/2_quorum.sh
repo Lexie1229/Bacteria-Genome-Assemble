@@ -92,6 +92,7 @@ readlinkf () {
 ## 纠错
 log_warn 2_quorum.sh
 
+## Q0L0、Q25L60、Q30L60
 for Q in 0 25 30; do
     for L in 0 60; do
         cd ${BASH_DIR}
@@ -130,7 +131,7 @@ ${PREFIX}2.fq.gz \
                         echo ${PREFIX}s.fq.gz;
                     fi
                 ) \
--p 10 \
+-p 12 \
                 --prefix ${PREFIX} \
                 -o quorum.sh
             bash quorum.sh
@@ -168,7 +169,7 @@ ${PREFIX}2.fq.gz \
                 tsv-sample |
                 awk '{OFS="\n"; print $1,$2,$3,$4}' \
                 > pe.cor.fa
-            pigz -p 10 pe.cor.fa
+            pigz -p 12 pe.cor.fa
             rm [RST].cor.fa.gz
         else
             mv R.cor.fa.gz pe.cor.fa.gz
