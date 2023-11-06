@@ -16,7 +16,6 @@
 mkdir -p ${HOME}/bin
 
 # 获取有关repo的信息，提取符合要求的下载链接，解压并拷贝到特定位置
-mkdir -p ${HOME}/bin
 curl -fsSL $(
     curl -fsSL https://api.github.com/repos/wang-q/anchr/releases/latest |
         jq -r '.assets[] | select(.name == "anchr-x86_64-unknown-linux-musl.tar.gz").browser_download_url'
@@ -387,7 +386,7 @@ popd
 # 下载参考数据：dh5alpha
 mkdir -p ~/biodata/bga/anchr/ref
 cd ~/biodata/bga/anchr/ref
-rsync -avP ftp.ncbi.nlm.nih.gov::genomes/all/GCF/001/723/505/GCF_001723505.1_ASM172350v1 dh5alpha/
+rsync -avP ftp.ncbi.nlm.nih.gov::genomes/all/GCF/001/723/505/GCF_001723505.1_ASM172350v1/ dh5alpha/
 
 # 参考基因组
 mkdir -p ~/biodata/bga/anchr/dh5alpha/1_genome
@@ -415,8 +414,7 @@ aria2c -x 9 -s 3 -c ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR112/039/SRR11245239/SR
 ln -s SRR11245239_1.fastq.gz R1.fq.gz
 ln -s SRR11245239_2.fastq.gz R2.fq.gz
 
-# 存在问题
-----------------------------------------------------------------------------------------------------
+## 以下部分存在问题
 mkdir -p ~/biodata/bga/anchr/dh5alpha/ena
 cd ~/biodata/bga/anchr/dh5alpha/ena
 
@@ -460,10 +458,9 @@ cd ~/biodata/bga/anchr/dh5alpha/2_illumina
 # 建立软链接，以确保测序数据文件名的格式
 ln -s ../ena/SRR11245239_1.fastq.gz R1.fq.gz
 ln -s ../ena/SRR11245239_2.fastq.gz R2.fq.gz
-----------------------------------------------------------------------------------------------------
 ```
 
-* 补充
+* 补充：取样
 
 ```bash
 # sampling reads as test materials
@@ -654,6 +651,7 @@ BASE_NAME=mg1655
 
 cd ${WORKING_DIR}/${BASE_NAME}
 
+# 生成脚本
 rm *.sh
 anchr template \
     --genome 4641652 \
@@ -688,4 +686,115 @@ anchr template \
     --extend \
     \
     --busco
+## 超算组装
+```
+
+#### Mycoplasma genitalium G37
+
+* Reference Genome
+
+```bash
+# 下载参考数据：g37
+mkdir -p ~/biodata/bga/anchr/ref
+cd ~/biodata/bga/anchr/ref
+rsync -avP ftp.ncbi.nlm.nih.gov::genomes/all/GCF/000/027/325/GCF_000027325.1_ASM2732v1/ g37/
+
+# 参考基因组
+mkdir -p ~/biodata/bga/anchr/g37/1_genome
+cd ~/biodata/bga/anchr/g37/1_genome
+## genome
+find ~/biodata/bga/anchr/ref/g37/ -name "*_genomic.fna.gz" |
+    grep -v "_from_" |
+    xargs gzip -dcf |
+    faops filter -N -s stdin genome.fa
+## -N：convert IUPAC ambiguous codes to 'N'
+## -s：simplify sequence names
+```
+
+* Sequencing Data Download
+
+```bash
+mkdir -p ~/biodata/bga/anchr/g37/2_illumina
+cd ~/biodata/bga/anchr/g37/2_illumina
+
+# 下载测序数据：ena
+aria2c -x 9 -s 3 -c ftp://ftp.sra.ebi.ac.uk/vol1/fastq/ERR486/ERR486835/ERR486835_1.fastq.gz
+aria2c -x 9 -s 3 -c ftp://ftp.sra.ebi.ac.uk/vol1/fastq/ERR486/ERR486835/ERR486835_2.fastq.gz
+
+# 建立软链接，以确保测序数据文件名的格式
+ln -s ERR486835_1.fastq.gz R1.fq.gz
+ln -s ERR486835_2.fastq.gz R2.fq.gz
+```
+
+* Generate Template
+
+```bash
+WORKING_DIR=${HOME}/biodata/bga/anchr
+BASE_NAME=g37
+
+cd ${WORKING_DIR}/${BASE_NAME}
+
+# 生成脚本
+rm *.sh
+anchr template \
+    --genome 580076 \
+    --parallel 10 \
+    --xmx 10g \
+    \
+    --fastqc \
+    --insertsize \
+    --fastk \
+    \
+    --trim "--dedupe --cutoff 30 --cutk 31" \
+    --qual "25 30" \
+    --len "60" \
+    --filter "adapter artifact" \
+    \
+    --quorum \
+    --merge \
+    --ecphase "1 2 3" \
+    \
+    --cov "40 80" \
+    --unitigger "bcalm bifrost superreads tadpole" \
+    --statp 2 \
+    --readl 125 \
+    --uscale 2 \
+    --lscale 3 \
+    --redo \
+    \
+    --extend
+# 本地组装
+# --parallel和--xmx根据本地实际核数和内存大小调整
+```
+
+* Genome Assemble
+
+```bash
+WORKING_DIR=${HOME}/biodata/bga/anchr
+BASE_NAME=g37
+
+cd ${WORKING_DIR}/${BASE_NAME}
+
+bash 0_master.sh
+# 脚本执行顺序
+# 2_fastqc.sh|2_insert_size.sh
+# 2_trim.sh|9_stat_reads.sh
+# 2_merge.sh|2_quorum.sh
+# 4_down_sampling.sh
+# 4_unitigs_bcalm.sh|4_anchors.sh|9_stat_anchors.sh
+# 4_unitigs_bifrost.sh|4_anchors.sh|9_stat_anchors.sh|
+# 4_unitigs_superreads.sh|4_anchors.sh|9_stat_anchors.sh
+# 4_unitigs_tadpole.sh|4_anchors.sh|9_stat_anchors.sh
+# 6_down_sampling.sh
+# 6_unitigs_bcalm.sh|6_anchors.sh|9_stat_anchors.sh
+# 6_unitigs_bifrost.sh|6_anchors.sh|9_stat_anchors.sh
+# 6_unitigs_superreads.sh|6_anchors.sh|9_stat_anchors.sh
+# 6_unitigs_tadpole.sh|6_anchors.sh|9_stat_anchors.sh
+# 7_merge_anchors.sh|9_stat_merge_anchors.sh
+
+# 存在问题bifrost
+
+prettier -w 9_markdown/*.md
+
+bash 0_cleanup.sh
 ```
